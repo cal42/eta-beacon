@@ -1,45 +1,85 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { SUPABASE_URL, SUPABASE_KEY, HOSPITALS } from "./config.js";
+import { GOOGLE_MAPS_BROWSER_KEY, GOOGLE_MAP_ID } from "./config.js";
+import { db, signIn, signOut } from "./auth.js";
 import { formatEta, formatMiles } from "./eta.js";
 
-const STALE_AFTER_S = 60;           // flag a unit if no update for 1 min
-const HIDE_ARRIVED_AFTER_S = 300;   // keep "arrived" units visible for 5 min
+const STALE_AFTER_S = 150;           // flag a unit after ~2 missed minute updates
+const HIDE_ARRIVED_AFTER_S = 300;    // keep "arrived" units visible for 5 min
 const IGNORE_ENROUTE_AFTER_S = 3600; // drop units silent for an hour
+const RELOAD_EVERY_MS = 30000;       // full refresh (catches units that diverted away)
 
-const db = createClient(SUPABASE_URL, SUPABASE_KEY);
 const $ = (id) => document.getElementById(id);
 
-// Which hospital this dashboard is for: ed.html?h=dominican
-for (const h of HOSPITALS) $("hospital").add(new Option(h.name, h.id));
-const wanted = new URLSearchParams(location.search).get("h");
-const hospital = HOSPITALS.find((h) => h.id === wanted) || HOSPITALS[0];
-$("hospital").value = hospital.id;
-$("hospital").onchange = () => { location.search = `?h=${$("hospital").value}`; };
+// ---- Sign in: the ED account decides which hospital this board shows ----
+const account = await signIn("ed");
+const { data: hospital, error: hErr } = await db
+  .from("hospitals").select("*").eq("id", account.hospital_id).single();
+if (hErr) throw new Error(`Couldn't load hospital: ${hErr.message}`);
 
-// Map (Leaflet + OpenStreetMap)
-const map = L.map("map").setView([hospital.lat, hospital.lng], 12);
-L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
-  maxZoom: 19,
-  attribution: "&copy; OpenStreetMap contributors",
-}).addTo(map);
-L.circleMarker([hospital.lat, hospital.lng], { radius: 10, color: "#e53935", fillOpacity: 0.8 })
-  .addTo(map)
-  .bindTooltip(hospital.name);
+$("hospname").textContent = hospital.name;
+$("board").hidden = false;
+$("signout").hidden = false;
+$("signout").onclick = signOut;
 
-const units = new Map();   // unit_id -> latest row from the database
-const markers = new Map(); // unit_id -> map marker
+// ---- Google map ----
+let map = null;
+const markers = new Map(); // unit_id -> AdvancedMarkerElement
+
+try {
+  await loadGoogleMaps();
+  map = new google.maps.Map($("map"), {
+    center: { lat: hospital.lat, lng: hospital.lng },
+    zoom: 13,
+    mapId: GOOGLE_MAP_ID,
+    colorScheme: "DARK",
+    streetViewControl: false,
+    mapTypeControl: false,
+  });
+  new google.maps.TrafficLayer().setMap(map);
+  new google.maps.marker.AdvancedMarkerElement({
+    map,
+    position: { lat: hospital.lat, lng: hospital.lng },
+    content: pin(hospital.name, "hosp"),
+    title: hospital.name,
+  });
+} catch (e) {
+  console.error(e);
+  $("map").textContent = "Map unavailable (check the Google Maps browser key in config.js).";
+  $("map").className = "sub mapfail";
+}
+
+function loadGoogleMaps() {
+  return new Promise((resolve, reject) => {
+    window.__gmapsReady = resolve;
+    window.gm_authFailure = () => reject(new Error("Google Maps key rejected"));
+    const s = document.createElement("script");
+    s.src =
+      "https://maps.googleapis.com/maps/api/js" +
+      `?key=${encodeURIComponent(GOOGLE_MAPS_BROWSER_KEY)}` +
+      "&v=weekly&loading=async&libraries=marker&callback=__gmapsReady";
+    s.async = true;
+    s.onerror = () => reject(new Error("Couldn't load Google Maps"));
+    document.head.append(s);
+  });
+}
+
+function pin(text, cls) {
+  const el = document.createElement("div");
+  el.className = `pin ${cls}`;
+  el.textContent = text;
+  return el;
+}
+
+// ---- Data ----
+let units = new Map(); // unit_id -> latest row
 
 function applyRow(row) {
   if (!row || !row.unit_id) return;
-  if (row.hospital_id !== hospital.id) {
-    // unit is going somewhere else (or diverted away) — drop it
-    units.delete(row.unit_id);
-    return;
-  }
-  units.set(row.unit_id, row);
+  if (row.hospital_id !== hospital.id) units.delete(row.unit_id); // diverted away
+  else units.set(row.unit_id, row);
 }
 
-async function loadInitial() {
+// The database only returns units headed to this hospital (row-level security)
+async function loadAll() {
   const since = new Date(Date.now() - IGNORE_ENROUTE_AFTER_S * 1000).toISOString();
   const { data, error } = await db
     .from("units")
@@ -47,11 +87,11 @@ async function loadInitial() {
     .eq("hospital_id", hospital.id)
     .gte("updated_at", since);
   if (error) return setConn(`Error: ${error.message}`, false);
-  data.forEach(applyRow);
+  units = new Map(data.map((r) => [r.unit_id, r]));
   render();
 }
 
-// Live updates: Supabase pushes every insert/update on the units table
+// Live updates: Supabase pushes changes this account is allowed to see
 db.channel("units-feed")
   .on("postgres_changes", { event: "*", schema: "public", table: "units" }, (payload) => {
     applyRow(payload.new);
@@ -59,8 +99,12 @@ db.channel("units-feed")
   })
   .subscribe((status) => {
     setConn(status === "SUBSCRIBED" ? "Live" : status, status === "SUBSCRIBED");
-    if (status === "SUBSCRIBED") loadInitial(); // (re)load whenever we (re)connect
+    if (status === "SUBSCRIBED") loadAll(); // (re)load whenever we (re)connect
   });
+
+// A unit that diverts to another hospital is no longer visible to this board,
+// so its "diverted" update never arrives here — a periodic reload clears it.
+setInterval(loadAll, RELOAD_EVERY_MS);
 
 function timing(row) {
   const ageS = (Date.now() - Date.parse(row.updated_at)) / 1000;
@@ -79,7 +123,7 @@ function render() {
       return a.leftS - b.leftS;
     });
 
-  // Update the list (built with textContent so unit names can't inject HTML)
+  // List (built with textContent so unit names can't inject HTML)
   const list = $("list");
   list.replaceChildren();
   if (!rows.some((x) => x.r.status === "enroute")) {
@@ -106,24 +150,32 @@ function render() {
     meta.textContent =
       r.status === "arrived"
         ? `${Math.round(ageS / 60)} min ago`
-        : `${formatMiles(r.distance_m)} · updated ${Math.round(ageS)}s ago${stale ? " · NO SIGNAL?" : ""}`;
+        : `${formatMiles(r.distance_m)} · updated ${Math.round(ageS)}s ago` +
+          `${r.eta_source === "estimate" ? " · rough estimate" : ""}` +
+          `${stale ? " · NO SIGNAL?" : ""}`;
 
     card.append(name, eta, meta);
     list.append(card);
   }
 
-  // Update map markers for units still en route
-  const shown = new Set(rows.filter((x) => x.r.status === "enroute").map((x) => x.r.unit_id));
+  // Map markers for units still en route
+  if (!map) return;
+  const shown = new Set(
+    rows.filter((x) => x.r.status === "enroute" && x.r.lat != null).map((x) => x.r.unit_id)
+  );
   for (const [id, m] of markers) {
-    if (!shown.has(id)) { m.remove(); markers.delete(id); }
+    if (!shown.has(id)) { m.map = null; markers.delete(id); }
   }
   for (const { r } of rows) {
-    if (!shown.has(r.unit_id) || r.lat == null) continue;
+    if (!shown.has(r.unit_id)) continue;
+    const pos = { lat: r.lat, lng: r.lng };
     const m = markers.get(r.unit_id);
-    if (m) m.setLatLng([r.lat, r.lng]);
+    if (m) m.position = pos;
     else markers.set(
       r.unit_id,
-      L.marker([r.lat, r.lng]).addTo(map).bindTooltip(r.unit_id, { permanent: true, direction: "top" })
+      new google.maps.marker.AdvancedMarkerElement({
+        map, position: pos, content: pin(r.unit_id, "unit"), title: r.unit_id,
+      })
     );
   }
 }

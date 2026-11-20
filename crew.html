@@ -9,15 +9,26 @@
 <body class="crew">
   <h1>ETA Beacon <span>Crew</span></h1>
 
-  <section id="setup">
-    <label>Unit
-      <input id="unit" placeholder="e.g. M14" autocapitalize="characters" autocomplete="off">
+  <form id="login" hidden>
+    <p class="sub">One-time setup for this rig phone.</p>
+    <label>Rig login
+      <input id="email" type="email" autocomplete="username" placeholder="m10@rigs.etabeacon">
     </label>
+    <label>Password
+      <input id="password" type="password" autocomplete="current-password">
+    </label>
+    <button class="big go">Sign in</button>
+    <p id="loginMsg" class="sub"></p>
+  </form>
+
+  <section id="setup" hidden>
+    <div class="unitname" id="unit"></div>
     <label>Destination
       <select id="hospital"></select>
     </label>
     <button id="start" class="big go">Start transport</button>
     <p id="msg" class="sub"></p>
+    <button id="signout" class="link">Sign this phone out</button>
   </section>
 
   <section id="live" hidden>

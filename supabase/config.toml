@@ -1,0 +1,4 @@
+# The eta function checks the caller's login itself (works with Supabase's
+# new publishable/secret keys), so the gateway's legacy JWT check is turned off.
+[functions.eta]
+verify_jwt = false

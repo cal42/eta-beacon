@@ -1,16 +1,19 @@
 // ===== ETA Beacon settings =====
-// 1) Paste these from Supabase: Project Settings → API
-//    (use the "anon" / "publishable" key — never the "service_role" / secret key)
+// Everything in this file is public (it ships to the browser). That's OK:
+// the database is locked to signed-in accounts, and the Google browser key
+// is restricted to this site's address in Google Cloud.
+
+// Supabase: Project Settings → API (the "publishable" key — never the secret key)
 export const SUPABASE_URL = "https://zzwjxlmnfjujyzgdfdte.supabase.co";
 export const SUPABASE_KEY = "sb_publishable_VcppjE49WaCFVIkkg0NIkg_dcH4drqg";
 
-// 2) Destinations. Get exact coordinates in Google Maps:
-//    right-click the ED ambulance entrance → click the numbers at the top to copy them.
-//    The coordinates below are rough placeholders — replace them.
-export const HOSPITALS = [
-  { id: "HMC", name: "Harborview ED", lat: 47.60463, lng: -122.32421 },
-  { id: "test",      name: "Test destination",      lat: 36.9741, lng: -122.0308 },
-];
+// Google Maps (ED board map). Google Cloud → APIs & Services → Credentials.
+// Restrict this key to "Maps JavaScript API" + your site (https://cal42.github.io/*).
+export const GOOGLE_MAPS_BROWSER_KEY = "AIzaSyB-N73Z9fqa-ycqZISGvjj042COgpJEbDE";
+// Map ID (Google Cloud → Google Maps Platform → Map management). "DEMO_MAP_ID" works for testing.
+export const GOOGLE_MAP_ID = "DEMO_MAP_ID";
 
-// How often the crew app sends a position + ETA update (milliseconds)
-export const UPDATE_INTERVAL_MS = 15000;
+// How often the rig phone sends a position + ETA update (milliseconds)
+export const UPDATE_INTERVAL_MS = 60000;
+
+// Hospitals now live in the database (hospitals table) — see setup.sql.

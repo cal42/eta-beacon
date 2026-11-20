@@ -4,21 +4,32 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>ETA Beacon – ED Board</title>
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
   <link rel="stylesheet" href="style.css">
 </head>
 <body class="ed">
   <header>
-    <h1>ETA Beacon <span>Inbound</span></h1>
-    <select id="hospital"></select>
+    <h1>ETA Beacon <span id="hospname">Inbound</span></h1>
     <span id="conn" class="bad">Connecting…</span>
+    <button id="signout" class="link" hidden>Sign out</button>
   </header>
-  <main>
+
+  <form id="login" class="panel" hidden>
+    <p class="sub">Sign in this ED screen.</p>
+    <label>ED login
+      <input id="email" type="email" autocomplete="username" placeholder="hmc@ed.etabeacon">
+    </label>
+    <label>Password
+      <input id="password" type="password" autocomplete="current-password">
+    </label>
+    <button class="big go">Sign in</button>
+    <p id="loginMsg" class="sub"></p>
+  </form>
+
+  <main id="board" hidden>
     <div id="list"></div>
     <div id="map"></div>
   </main>
 
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script type="module" src="ed.js"></script>
 </body>
 </html>

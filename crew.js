@@ -1,33 +1,44 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { SUPABASE_URL, SUPABASE_KEY, HOSPITALS, UPDATE_INTERVAL_MS } from "./config.js";
-import { getRoute, formatEta, formatMiles } from "./eta.js";
+import { UPDATE_INTERVAL_MS } from "./config.js";
+import { db, signIn, signOut } from "./auth.js";
+import { formatEta, formatMiles } from "./eta.js";
 
-const db = createClient(SUPABASE_URL, SUPABASE_KEY);
 const $ = (id) => document.getElementById(id);
 
-// Fill the destination dropdown and remember the last unit name used
-for (const h of HOSPITALS) $("hospital").add(new Option(h.name, h.id));
-try { $("unit").value = localStorage.getItem("unit") || ""; } catch {}
-
+let hospitals = [];
+let unitId = null;
+let hospital = null;
 let watchId = null;
 let timer = null;
 let wakeLock = null;
 let lastPos = null;
-let unitId = null;
-let hospital = null;
 let sending = false;
+let lastEta = null; // { seconds, at } — for counting down between updates
 
+// ---- Start-up: sign in (once per phone), then load destinations ----
+const account = await signIn("rig");
+unitId = account.unit_id;
+$("unit").textContent = unitId;
+
+const { data, error } = await db.from("hospitals").select("id, name").order("name");
+if (error) showMsg(`Couldn't load destinations: ${error.message}`);
+hospitals = data ?? [];
+for (const h of hospitals) $("hospital").add(new Option(h.name, h.id));
+$("setup").hidden = false;
+
+$("signout").onclick = signOut;
+
+// ---- Transport ----
 $("start").onclick = async () => {
-  unitId = $("unit").value.trim().toUpperCase();
-  if (!unitId) return showMsg("Enter your unit name first.");
   if (!("geolocation" in navigator)) return showMsg("This browser can't share location.");
-  hospital = HOSPITALS.find((h) => h.id === $("hospital").value);
-  try { localStorage.setItem("unit", unitId); } catch {}
+  hospital = hospitals.find((h) => h.id === $("hospital").value);
+  if (!hospital) return showMsg("Pick a destination.");
 
   $("setup").hidden = true;
   $("live").hidden = false;
   $("dest").textContent = `${unitId} → ${hospital.name}`;
   $("eta").textContent = "--";
+  $("dist").textContent = "";
+  lastEta = null;
   setStatus("Waiting for GPS…");
   await keepAwake();
 
@@ -47,45 +58,49 @@ async function sendUpdate() {
   if (!lastPos || sending) return;
   sending = true;
   try {
-    const { latitude: lat, longitude: lng } = lastPos;
-    const route = await getRoute(lat, lng, hospital.lat, hospital.lng);
-    $("eta").textContent = formatEta(route.seconds);
-    $("dist").textContent = formatMiles(route.meters);
-
-    const { error } = await db.from("units").upsert({
-      unit_id: unitId,
-      hospital_id: hospital.id,
-      status: "enroute",
-      lat,
-      lng,
-      eta_seconds: Math.round(route.seconds),
-      distance_m: Math.round(route.meters),
-      updated_at: new Date().toISOString(),
+    const { data, error } = await db.functions.invoke("eta", {
+      body: { hospital_id: hospital.id, lat: lastPos.latitude, lng: lastPos.longitude },
     });
+    if (error) return setStatus(`NOT SENT: ${await errorText(error)}`);
+    lastEta = { seconds: data.eta_seconds, at: Date.now() };
+    $("dist").textContent = formatMiles(data.distance_m);
+    tick();
     setStatus(
-      error
-        ? `NOT SENT: ${error.message}`
-        : `Sent ${new Date().toLocaleTimeString()}${route.estimated ? " (rough estimate)" : ""}`
+      `Sent ${new Date().toLocaleTimeString()}${data.eta_source === "estimate" ? " (rough estimate)" : ""}`
     );
+  } catch (e) {
+    setStatus(`NOT SENT: ${e.message}`);
   } finally {
     sending = false;
   }
 }
 
+// Count the ETA down every second between minute-by-minute updates
+function tick() {
+  if (!lastEta) return;
+  const left = Math.max(0, lastEta.seconds - (Date.now() - lastEta.at) / 1000);
+  $("eta").textContent = formatEta(left);
+}
+setInterval(tick, 1000);
+
 $("arrived").onclick = async () => {
   navigator.geolocation.clearWatch(watchId);
   clearInterval(timer);
-  const { error } = await db
-    .from("units")
-    .update({ status: "arrived", eta_seconds: 0, updated_at: new Date().toISOString() })
-    .eq("unit_id", unitId);
+  timer = null;
+  const { error } = await db.functions.invoke("eta", { body: { action: "arrived" } });
   try { await wakeLock?.release(); } catch {}
   wakeLock = null;
   lastPos = null;
+  lastEta = null;
   $("live").hidden = true;
   $("setup").hidden = false;
-  showMsg(error ? `Couldn't mark arrived: ${error.message}` : "Marked arrived. Ready for next transport.");
+  showMsg(error ? `Couldn't mark arrived: ${await errorText(error)}` : "Marked arrived. Ready for next transport.");
 };
+
+// Pull the server's error message out of a failed function call
+async function errorText(error) {
+  try { return (await error.context.json()).error || error.message; } catch { return error.message; }
+}
 
 // Keep the screen on — phones pause web pages when the screen locks
 async function keepAwake() {
