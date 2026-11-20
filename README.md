@@ -23,6 +23,9 @@ Live, traffic-aware ETAs from Seattle Fire medic units to Seattle emergency depa
 - **Backend:** Supabase. Database, logins, live updates, and one Edge Function (`supabase/functions/eta`).
 - **ETA:** Google Routes API with `TRAFFIC_AWARE` routing, called only from the Edge Function so the key stays secret. If Google is unreachable, a straight-line estimate is used and labelled "rough estimate".
 - **Map:** Google Maps JavaScript API with the traffic layer.
+- **On scene, then transporting:** after the crew picks a destination, the ED sees "On scene · 12 min away". Once the phone has moved 100 m, the ED sees a counting-down ETA with "TRANSPORTING" below it.
+- **Two ETAs:** the EMS app shows "No lights & sirens" (Google's ETA) and "Lights & sirens" (currently assumed 25% faster), plus the time difference. The app detects which mode the unit is driving in, and the ED sees the matching ETA. Until the mode is detected, the ED sees the agency's default (`agencies.default_driving_mode`): Seattle Fire = lights & sirens.
+- **Automatic arrival and departure:** the rig phone records arrival within `hospitals.arrival_radius_m` (50 m) of the ED entrance; the Arrived button remains as a backup. The ED card then counts up ("ARRIVED · 5:23 ago") until the rig drives beyond `hospitals.departure_radius_m` (100 m), when it drops off the board.
 - **No patient data** is stored. The app keeps only the unit name, destination, location, ETA and status.
 
 ## Security model
@@ -69,6 +72,23 @@ Live, traffic-aware ETAs from Seattle Fire medic units to Seattle emergency depa
 
 ### 4. Create device logins
 For each rig phone, ED screen and provider: Authentication → Users → Add user → Create new user (tick Auto Confirm), then link it to a unit or hospital using the SQL at the bottom of `setup.sql`.
+
+## ETA accuracy data
+Every transport and every ETA is recorded raw so a correction factor can be built later. Only you can read this data, through the Supabase dashboard; no app login can.
+
+| Table / view | Contents |
+|---|---|
+| `transports` | One row per transport: start, first ETA, arrival time, arrival method (`auto` geofence or `button`), closest approach to the entrance, trauma level, final driving mode |
+| `eta_samples` | One row per ETA (≈ every minute): position, GPS accuracy and speed, Google ETA, lights-and-sirens ETA, ETA shown to the ED, detected mode, progress ratio |
+| `eta_accuracy` | View joining the two for completed transports: actual time remaining vs. each prediction (`google_error_s`, `ls_error_s`, `best_error_s`, positive = arrived later than predicted), `actual_over_google`, local hour and weekday |
+
+To use it: in Supabase → SQL Editor, run `select * from eta_accuracy`, then **Export → CSV** for Excel or Google Sheets. There are example queries at the bottom of `setup.sql`.
+
+**Driving-mode detection:** every minute the Edge Function compares how fast Google's ETA has fallen over the last 2–5 minutes with how much time has passed (`progress_ratio`). About 1.0 means driving with traffic; about 1.33 means the 25%-faster lights-and-sirens pace. Above 1.2 switches the mode to lights and sirens, and below 1.1 switches back. The 0.75 factor and these thresholds are constants at the top of `supabase/functions/eta/index.ts`, and each sample records the factor that was in effect.
+
+**Geofence radii:** change them per hospital, e.g. `update hospitals set arrival_radius_m = 75, departure_radius_m = 150 where id = 'HMC';`. The phone picks up the new values the next time the EMS page loads.
+
+**Agencies:** add one with `insert into agencies values ('AMR', 'AMR', 'normal');`, and set a rig's agency with `agency_id` in `accounts`. `transports` also records scene time (`left_scene_at`) and time at the hospital (`departed_at`).
 
 ## Trauma codes
 - The ED taps **Modified** or **Full** on an inbound unit, then taps again to confirm. **Cancel** clears the code. Changing Modified to Full counts as a new activation and alerts providers again.

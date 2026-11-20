@@ -3,7 +3,7 @@ import { db, signIn, signOut } from "./auth.js";
 import { formatEta, formatMiles, TRAUMA_LABELS, respondersText } from "./eta.js";
 
 const STALE_AFTER_S = 150;           // flag a unit after ~2 missed minute updates
-const HIDE_ARRIVED_AFTER_S = 300;    // keep "arrived" units visible for 5 min
+const HIDE_ARRIVED_AFTER_S = 7200;   // safety net: arrived units normally clear when they drive away
 const IGNORE_ENROUTE_AFTER_S = 3600; // drop units silent for an hour
 const RELOAD_EVERY_MS = 30000;       // full refresh (catches units that diverted away)
 const CONFIRM_WINDOW_MS = 4000;      // trauma buttons need a second tap within this time
@@ -114,8 +114,19 @@ setInterval(loadAll, RELOAD_EVERY_MS);
 
 function timing(row) {
   const ageS = (Date.now() - Date.parse(row.updated_at)) / 1000;
-  const leftS = Math.max(0, (row.eta_seconds ?? 0) - ageS); // count down between updates
+  // Count down between updates while transporting; on scene the drive hasn't started
+  const leftS = row.phase === "onscene"
+    ? row.eta_seconds ?? 0
+    : Math.max(0, (row.eta_seconds ?? 0) - ageS);
   return { ageS, leftS };
+}
+
+// "5:23" / "1:02:09" — time since arrival, counting up
+function formatCountUp(fromIso) {
+  const s = Math.max(0, Math.floor((Date.now() - Date.parse(fromIso)) / 1000));
+  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
+  const mm = h ? String(m).padStart(2, "0") : String(m);
+  return `${h ? `${h}:` : ""}${mm}:${String(sec).padStart(2, "0")}`;
 }
 
 // ---- Rendering ----
@@ -127,10 +138,13 @@ function render() {
   const rows = [...units.values()]
     .map((r) => ({ r, ...timing(r) }))
     .filter((x) =>
-      x.r.status === "enroute" ? x.ageS < IGNORE_ENROUTE_AFTER_S : x.ageS < HIDE_ARRIVED_AFTER_S
+      x.r.status === "enroute" ? x.ageS < IGNORE_ENROUTE_AFTER_S
+      : x.r.status === "arrived" ? x.ageS < HIDE_ARRIVED_AFTER_S
+      : false // departed: drove away from the hospital
     )
     .sort((a, b) => {
       if (a.r.status !== b.r.status) return a.r.status === "enroute" ? -1 : 1;
+      if (a.r.status === "arrived") return Date.parse(b.r.arrived_at ?? b.r.updated_at) - Date.parse(a.r.arrived_at ?? a.r.updated_at);
       return a.leftS - b.leftS;
     });
 
@@ -146,8 +160,9 @@ function render() {
     top.append(el("div", "unit", r.unit_id));
     if (r.trauma_level) top.append(el("span", `badge ${r.trauma_level}`, TRAUMA_LABELS[r.trauma_level]));
     const eta = el("div", "eta");
+    const phase = el("div", "phase");
     const meta = el("div", "sub");
-    card.append(top, eta, meta);
+    card.append(top, eta, phase, meta);
 
     if (r.trauma_level) {
       card.append(el("div", "sub responders", respondersText(acks.filter((a) => a.trauma_id === r.trauma_id))));
@@ -155,26 +170,38 @@ function render() {
     if (r.status === "enroute") card.append(traumaButtons(r));
 
     list.append(card);
-    cardEls.set(r.unit_id, { card, eta, meta });
+    cardEls.set(r.unit_id, { card, eta, phase, meta });
   }
   tick();
   renderMarkers(rows);
 }
 
 function tick() {
-  for (const [id, { card, eta, meta }] of cardEls) {
+  for (const [id, { card, eta, phase, meta }] of cardEls) {
     const r = units.get(id);
     if (!r) continue;
     const { ageS, leftS } = timing(r);
     const stale = r.status === "enroute" && ageS > STALE_AFTER_S;
     card.classList.toggle("stale", stale);
-    eta.textContent = r.status === "arrived" ? "ARRIVED" : formatEta(leftS);
+
+    if (r.status === "arrived") {
+      eta.textContent = "ARRIVED";
+      phase.textContent = `${formatCountUp(r.arrived_at ?? r.updated_at)} ago`;
+      phase.className = "phase arrived";
+      meta.textContent = "";
+      continue;
+    }
+
+    const onScene = r.phase === "onscene";
+    eta.textContent = onScene ? "On scene" : formatEta(leftS);
+    phase.textContent = onScene ? `${formatEta(leftS)} away` : "TRANSPORTING";
+    phase.className = `phase ${onScene ? "onscene" : "transporting"}`;
+    const ls = r.driving_mode === "ls" || (r.driving_mode !== "normal" && r.default_mode === "ls");
     meta.textContent =
-      r.status === "arrived"
-        ? `${Math.round(ageS / 60)} min ago`
-        : `${formatMiles(r.distance_m)} · updated ${Math.round(ageS)}s ago` +
-          `${r.eta_source === "estimate" ? " · rough estimate" : ""}` +
-          `${stale ? " · NO SIGNAL?" : ""}`;
+      `${formatMiles(r.distance_m)} · updated ${Math.round(ageS)}s ago` +
+      `${!onScene && ls ? " · lights & sirens ETA" : ""}` +
+      `${r.eta_source === "estimate" ? " · rough estimate" : ""}` +
+      `${stale ? " · NO SIGNAL?" : ""}`;
   }
 }
 setInterval(tick, 1000);

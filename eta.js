@@ -9,6 +9,18 @@ export function formatEta(seconds) {
   return `${Math.floor(mins / 60)}h ${mins % 60}m`;
 }
 
+// Straight-line distance between two GPS points, in meters
+export function haversineMeters(lat1, lng1, lat2, lng2) {
+  const R = 6371000;
+  const toRad = (d) => (d * Math.PI) / 180;
+  const a =
+    Math.sin(toRad(lat2 - lat1) / 2) ** 2 +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(toRad(lng2 - lng1) / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(a));
+}
+
+export const MODE_LABELS = { ls: "lights & sirens", normal: "driving with traffic", unknown: "detecting…" };
+
 export const TRAUMA_LABELS = { modified: "MODIFIED TRAUMA", full: "FULL TRAUMA" };
 
 // Who is responding to a trauma activation, from trauma_acks rows

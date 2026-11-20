@@ -33,10 +33,20 @@
 
   <section id="live" hidden>
     <div class="sub" id="dest"></div>
-    <div class="eta" id="eta">--</div>
+    <div id="phase" class="phase onscene">ON SCENE</div>
+    <div class="etarow" id="row-normal">
+      <span class="etalabel">No lights &amp; sirens</span>
+      <span class="etaval" id="eta-normal">--</span>
+    </div>
+    <div class="etarow" id="row-ls">
+      <span class="etalabel">Lights &amp; sirens</span>
+      <span class="etaval" id="eta-ls">--</span>
+    </div>
+    <div class="sub" id="diff"></div>
+    <div class="sub" id="mode"></div>
     <div class="sub" id="dist"></div>
     <div class="sub" id="status"></div>
-    <p class="hint">Keep this screen open during transport.</p>
+    <p class="hint">Keep this screen open during transport. Arrival is recorded automatically at the ED entrance.</p>
     <button id="arrived" class="big stop">Arrived</button>
   </section>
 

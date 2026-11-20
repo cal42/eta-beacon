@@ -28,6 +28,16 @@ input, select {
 .stop { background: #2e7d32; margin-top: 2rem; }
 .alt { background: #37414d; }
 .ems .eta { font-size: 4rem; font-weight: 700; margin: 0.5rem 0; }
+.etarow {
+  display: flex; justify-content: space-between; align-items: baseline; gap: 1rem;
+  padding: 0.6rem 0.9rem; margin: 0.6rem 0; border-radius: 12px;
+  background: #1b2027; border: 2px solid transparent;
+}
+.etarow .etalabel { color: #9aa4b2; font-size: 1rem; }
+.etarow .etaval { font-size: 2.6rem; font-weight: 700; white-space: nowrap; }
+.etarow.active { border-color: #1e88e5; }
+.etarow.active .etalabel { color: #f2f4f7; font-weight: 600; }
+#row-ls.active { border-color: #ff6b5b; }
 .unitname { font-size: 2.2rem; font-weight: 700; margin-bottom: 1rem; }
 .link {
   background: none; border: 0; padding: 0.5rem 0; color: #6b7686;
@@ -64,6 +74,11 @@ main { flex: 1; display: flex; min-height: 0; }
 }
 .card .unit { font-weight: 700; font-size: 1.1rem; }
 .card .eta { font-size: 2.2rem; font-weight: 700; }
+.phase { font-weight: 800; letter-spacing: 0.04em; font-size: 0.95rem; margin: 0.1rem 0 0.25rem; }
+.phase.onscene { color: #f9a825; }
+.phase.transporting { color: #64b5f6; }
+.phase.arrived { color: #81c784; font-variant-numeric: tabular-nums; font-size: 1.2rem; }
+.ems .phase { font-size: 1.1rem; margin: 0.5rem 0; }
 .card.stale { border-left-color: #f9a825; }
 .card.arrived { border-left-color: #2e7d32; opacity: 0.6; }
 .card.trauma-modified { border-left-color: #ef6c00; }

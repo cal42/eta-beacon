@@ -98,7 +98,10 @@ function activeTraumas() {
       const ageS = (Date.now() - Date.parse(r.updated_at)) / 1000;
       return { r, ageS, leftS: Math.max(0, (r.eta_seconds ?? 0) - ageS) };
     })
-    .filter((x) => (x.r.status === "enroute" ? x.ageS < IGNORE_AFTER_S : x.ageS < HIDE_ARRIVED_AFTER_S))
+    .filter((x) =>
+      x.r.status === "enroute" ? x.ageS < IGNORE_AFTER_S
+      : x.r.status === "arrived" ? x.ageS < HIDE_ARRIVED_AFTER_S
+      : false) // departed
     .sort((a, b) => {
       if (a.r.status !== b.r.status) return a.r.status === "enroute" ? -1 : 1;
       if (a.r.trauma_level !== b.r.trauma_level) return a.r.trauma_level === "full" ? -1 : 1;
@@ -231,10 +234,14 @@ function tick() {
     if (!r) continue;
     const ageS = (Date.now() - Date.parse(r.updated_at)) / 1000;
     const setS = (Date.now() - Date.parse(r.trauma_set_at)) / 1000;
-    eta.textContent = r.status === "arrived" ? "ARRIVED" : formatEta(Math.max(0, (r.eta_seconds ?? 0) - ageS));
+    const onScene = r.status === "enroute" && r.phase === "onscene";
+    eta.textContent = r.status === "arrived" ? "ARRIVED"
+      : onScene ? `On scene · ${formatEta(r.eta_seconds)} away`
+      : formatEta(Math.max(0, (r.eta_seconds ?? 0) - ageS));
     meta.textContent =
       `Activated ${Math.max(0, Math.round(setS / 60))} min ago` +
-      (r.status === "enroute" ? ` · ${formatMiles(r.distance_m)}` : "");
+      (r.status === "enroute" ? ` · ${formatMiles(r.distance_m)}` : "") +
+      (r.status === "enroute" && !onScene ? " · transporting" : "");
   }
 }
 setInterval(tick, 1000);
