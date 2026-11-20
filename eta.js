@@ -1,4 +1,4 @@
-// Display helpers shared by the crew app and ED board.
+// Display helpers shared by the EMS app and ED board.
 // (Routing now happens server-side in supabase/functions/eta.)
 
 export function formatEta(seconds) {

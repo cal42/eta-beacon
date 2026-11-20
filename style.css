@@ -11,8 +11,8 @@ h1 span { color: #ff6b5b; font-weight: 400; }
 .sub { color: #9aa4b2; margin: 0.25rem 0; }
 .hint { color: #6b7686; font-size: 0.85rem; }
 
-/* ---- Crew app ---- */
-body.crew { padding: 1.25rem; max-width: 480px; margin: 0 auto; }
+/* ---- EMS app ---- */
+body.ems { padding: 1.25rem; max-width: 480px; margin: 0 auto; }
 label { display: block; margin-bottom: 1rem; color: #9aa4b2; }
 input, select {
   display: block; width: 100%; margin-top: 0.35rem; padding: 0.8rem;
@@ -27,7 +27,7 @@ input, select {
 .go { background: #1e88e5; }
 .stop { background: #2e7d32; margin-top: 2rem; }
 .alt { background: #37414d; }
-.crew .eta { font-size: 4rem; font-weight: 700; margin: 0.5rem 0; }
+.ems .eta { font-size: 4rem; font-weight: 700; margin: 0.5rem 0; }
 .unitname { font-size: 2.2rem; font-weight: 700; margin-bottom: 1rem; }
 .link {
   background: none; border: 0; padding: 0.5rem 0; color: #6b7686;

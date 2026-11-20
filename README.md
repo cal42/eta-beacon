@@ -5,7 +5,7 @@ Live, traffic-aware ETAs from Seattle Fire medic units to Seattle emergency depa
 ## Architecture
 
 ```
- Rig phone (crew.html)          Supabase                                   ED screen (ed.html)
+ Rig phone (ems.html)           Supabase                                   ED screen (ed.html)
  ─────────────────────          ────────                                   ───────────────────
  signed in as its unit   ──►    "eta" Edge Function                        signed in as its ED
  GPS every 60 s                   ├─ checks the login is a rig             Google map + traffic layer
@@ -34,7 +34,7 @@ Live, traffic-aware ETAs from Seattle Fire medic units to Seattle emergency depa
 | `setup.sql` | Tables, security rules, hospital list (safe to re-run) |
 | `supabase/functions/eta/index.ts` | Edge Function: checks the login, gets the Google ETA, saves the update |
 | `auth.js` | Shared sign-in |
-| `crew.html` / `crew.js` | Rig phone: pick destination, sends GPS every minute |
+| `ems.html` / `ems.js` | Rig phone: pick destination, sends GPS every minute |
 | `ed.html` / `ed.js` | ED board: live inbound list + Google map |
 | `eta.js` | Display helpers |
 

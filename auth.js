@@ -1,4 +1,4 @@
-// Sign-in shared by the crew app and ED board.
+// Sign-in shared by the EMS app and ED board.
 // Each device signs in once; the session is remembered on that device.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
