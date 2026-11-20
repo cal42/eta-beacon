@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ETA Beacon – Provider</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="provider">
+  <header>
+    <h1>ETA Beacon <span>Provider</span></h1>
+    <span id="conn" class="bad">Connecting…</span>
+  </header>
+
+  <form id="login" class="panel" hidden>
+    <p class="sub">Sign in to receive trauma alerts.</p>
+    <label>Provider login
+      <input id="email" type="email" autocomplete="username">
+    </label>
+    <label>Password
+      <input id="password" type="password" autocomplete="current-password">
+    </label>
+    <button class="big go">Sign in</button>
+    <p id="loginMsg" class="sub"></p>
+  </form>
+
+  <div id="app" class="panel" hidden>
+    <div class="sub" id="who"></div>
+
+    <div id="armbox">
+      <button id="arm" class="big go">Turn on trauma alerts</button>
+      <p class="hint">Alerts need one tap each time this page opens (browsers block sound until you tap).</p>
+    </div>
+    <p id="armed" class="sub armedline" hidden>Alerts on. Keep this page open.</p>
+
+    <div id="list"></div>
+    <button id="signout" class="link">Sign out</button>
+  </div>
+
+  <script type="module" src="provider.js"></script>
+</body>
+</html>

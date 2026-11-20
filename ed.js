@@ -1,11 +1,12 @@
 import { GOOGLE_MAPS_BROWSER_KEY, GOOGLE_MAP_ID } from "./config.js";
 import { db, signIn, signOut } from "./auth.js";
-import { formatEta, formatMiles } from "./eta.js";
+import { formatEta, formatMiles, TRAUMA_LABELS, respondersText } from "./eta.js";
 
 const STALE_AFTER_S = 150;           // flag a unit after ~2 missed minute updates
 const HIDE_ARRIVED_AFTER_S = 300;    // keep "arrived" units visible for 5 min
 const IGNORE_ENROUTE_AFTER_S = 3600; // drop units silent for an hour
 const RELOAD_EVERY_MS = 30000;       // full refresh (catches units that diverted away)
+const CONFIRM_WINDOW_MS = 4000;      // trauma buttons need a second tap within this time
 
 const $ = (id) => document.getElementById(id);
 
@@ -71,6 +72,7 @@ function pin(text, cls) {
 
 // ---- Data ----
 let units = new Map(); // unit_id -> latest row
+let acks = [];         // trauma_acks rows for this hospital (recent)
 
 function applyRow(row) {
   if (!row || !row.unit_id) return;
@@ -78,23 +80,27 @@ function applyRow(row) {
   else units.set(row.unit_id, row);
 }
 
-// The database only returns units headed to this hospital (row-level security)
+// The database only returns rows for this hospital (row-level security)
 async function loadAll() {
   const since = new Date(Date.now() - IGNORE_ENROUTE_AFTER_S * 1000).toISOString();
-  const { data, error } = await db
-    .from("units")
-    .select("*")
-    .eq("hospital_id", hospital.id)
-    .gte("updated_at", since);
-  if (error) return setConn(`Error: ${error.message}`, false);
-  units = new Map(data.map((r) => [r.unit_id, r]));
+  const [u, a] = await Promise.all([
+    db.from("units").select("*").eq("hospital_id", hospital.id).gte("updated_at", since),
+    db.from("trauma_acks").select("*").eq("hospital_id", hospital.id).gte("acked_at", since),
+  ]);
+  if (u.error) return setConn(`Error: ${u.error.message}`, false);
+  units = new Map(u.data.map((r) => [r.unit_id, r]));
+  if (!a.error) acks = a.data;
   render();
 }
 
 // Live updates: Supabase pushes changes this account is allowed to see
-db.channel("units-feed")
+db.channel("ed-feed")
   .on("postgres_changes", { event: "*", schema: "public", table: "units" }, (payload) => {
     applyRow(payload.new);
+    render();
+  })
+  .on("postgres_changes", { event: "INSERT", schema: "public", table: "trauma_acks" }, (payload) => {
+    acks.push(payload.new);
     render();
   })
   .subscribe((status) => {
@@ -112,6 +118,11 @@ function timing(row) {
   return { ageS, leftS };
 }
 
+// ---- Rendering ----
+// render() rebuilds the cards when data changes; tick() updates the countdown
+// text every second without rebuilding (so button taps aren't interrupted).
+const cardEls = new Map(); // unit_id -> { card, eta, meta }
+
 function render() {
   const rows = [...units.values()]
     .map((r) => ({ r, ...timing(r) }))
@@ -123,66 +134,131 @@ function render() {
       return a.leftS - b.leftS;
     });
 
-  // List (built with textContent so unit names can't inject HTML)
   const list = $("list");
   list.replaceChildren();
+  cardEls.clear();
   if (!rows.some((x) => x.r.status === "enroute")) {
-    const empty = document.createElement("p");
-    empty.className = "sub";
-    empty.textContent = "No inbound units.";
-    list.append(empty);
+    list.append(el("p", "sub", "No inbound units."));
   }
-  for (const { r, ageS, leftS } of rows) {
-    const card = document.createElement("div");
+  for (const { r } of rows) {
+    const card = el("div", `card ${r.status}${r.trauma_level ? ` trauma-${r.trauma_level}` : ""}`);
+    const top = el("div", "cardtop");
+    top.append(el("div", "unit", r.unit_id));
+    if (r.trauma_level) top.append(el("span", `badge ${r.trauma_level}`, TRAUMA_LABELS[r.trauma_level]));
+    const eta = el("div", "eta");
+    const meta = el("div", "sub");
+    card.append(top, eta, meta);
+
+    if (r.trauma_level) {
+      card.append(el("div", "sub responders", respondersText(acks.filter((a) => a.trauma_id === r.trauma_id))));
+    }
+    if (r.status === "enroute") card.append(traumaButtons(r));
+
+    list.append(card);
+    cardEls.set(r.unit_id, { card, eta, meta });
+  }
+  tick();
+  renderMarkers(rows);
+}
+
+function tick() {
+  for (const [id, { card, eta, meta }] of cardEls) {
+    const r = units.get(id);
+    if (!r) continue;
+    const { ageS, leftS } = timing(r);
     const stale = r.status === "enroute" && ageS > STALE_AFTER_S;
-    card.className = `card ${r.status}${stale ? " stale" : ""}`;
-
-    const name = document.createElement("div");
-    name.className = "unit";
-    name.textContent = r.unit_id;
-
-    const eta = document.createElement("div");
-    eta.className = "eta";
+    card.classList.toggle("stale", stale);
     eta.textContent = r.status === "arrived" ? "ARRIVED" : formatEta(leftS);
-
-    const meta = document.createElement("div");
-    meta.className = "sub";
     meta.textContent =
       r.status === "arrived"
         ? `${Math.round(ageS / 60)} min ago`
         : `${formatMiles(r.distance_m)} · updated ${Math.round(ageS)}s ago` +
           `${r.eta_source === "estimate" ? " · rough estimate" : ""}` +
           `${stale ? " · NO SIGNAL?" : ""}`;
-
-    card.append(name, eta, meta);
-    list.append(card);
   }
+}
+setInterval(tick, 1000);
+setInterval(render, 15000); // re-check which units should be hidden
 
-  // Map markers for units still en route
+// Modified / Full / Cancel buttons. Each needs a confirming second tap.
+function traumaButtons(r) {
+  const wrap = el("div", "tbtns");
+  const id = r.unit_id;
+  if (r.trauma_level !== "modified") {
+    wrap.append(confirmButton(`${id}:modified`, "Modified", "Confirm MODIFIED", "modified", () => setTrauma(id, "modified")));
+  }
+  if (r.trauma_level !== "full") {
+    wrap.append(confirmButton(`${id}:full`, "Full", "Confirm FULL", "full", () => setTrauma(id, "full")));
+  }
+  if (r.trauma_level) {
+    wrap.append(confirmButton(`${id}:cancel`, "Cancel", "Confirm cancel", "cancel", () => setTrauma(id, null)));
+  }
+  return wrap;
+}
+
+// The "armed" (waiting for confirm) state is kept here, outside the button,
+// so it survives the card being redrawn by a live update.
+let armedKey = null;
+let armedUntil = 0;
+
+function confirmButton(key, label, confirmLabel, cls, action) {
+  const armed = armedKey === key && Date.now() < armedUntil;
+  const b = el("button", `tbtn ${cls}${armed ? " armed" : ""}`, armed ? confirmLabel : label);
+  b.onclick = async () => {
+    if (!(armedKey === key && Date.now() < armedUntil)) {
+      armedKey = key;
+      armedUntil = Date.now() + CONFIRM_WINDOW_MS;
+      render();
+      setTimeout(() => { if (armedKey === key && Date.now() >= armedUntil) { armedKey = null; render(); } }, CONFIRM_WINDOW_MS + 50);
+      return;
+    }
+    armedKey = null;
+    b.disabled = true;
+    b.textContent = "…";
+    await action();
+  };
+  return b;
+}
+
+async function setTrauma(unitId, level) {
+  const { error } = await db.rpc("set_trauma", { p_unit_id: unitId, p_level: level });
+  if (error) alert(`Couldn't update trauma code: ${error.message}`);
+  loadAll();
+}
+
+function renderMarkers(rows) {
   if (!map) return;
-  const shown = new Set(
-    rows.filter((x) => x.r.status === "enroute" && x.r.lat != null).map((x) => x.r.unit_id)
-  );
+  const shown = rows.filter((x) => x.r.status === "enroute" && x.r.lat != null).map((x) => x.r);
+  const ids = new Set(shown.map((r) => r.unit_id));
   for (const [id, m] of markers) {
-    if (!shown.has(id)) { m.map = null; markers.delete(id); }
+    if (!ids.has(id)) { m.map = null; markers.delete(id); }
   }
-  for (const { r } of rows) {
-    if (!shown.has(r.unit_id)) continue;
+  for (const r of shown) {
     const pos = { lat: r.lat, lng: r.lng };
+    const cls = `unit${r.trauma_level ? ` ${r.trauma_level}` : ""}`;
     const m = markers.get(r.unit_id);
-    if (m) m.position = pos;
-    else markers.set(
-      r.unit_id,
-      new google.maps.marker.AdvancedMarkerElement({
-        map, position: pos, content: pin(r.unit_id, "unit"), title: r.unit_id,
-      })
-    );
+    if (m) {
+      m.position = pos;
+      m.content.className = `pin ${cls}`;
+    } else {
+      markers.set(
+        r.unit_id,
+        new google.maps.marker.AdvancedMarkerElement({
+          map, position: pos, content: pin(r.unit_id, cls), title: r.unit_id,
+        })
+      );
+    }
   }
+}
+
+function el(tag, className, text) {
+  const e = document.createElement(tag);
+  if (className) e.className = className;
+  if (text != null) e.textContent = text;
+  return e;
 }
 
 function setConn(text, ok) {
   $("conn").textContent = text;
   $("conn").className = ok ? "ok" : "bad";
 }
-
-setInterval(render, 1000); // tick the countdowns every second

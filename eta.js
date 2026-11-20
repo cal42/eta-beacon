@@ -9,6 +9,14 @@ export function formatEta(seconds) {
   return `${Math.floor(mins / 60)}h ${mins % 60}m`;
 }
 
+export const TRAUMA_LABELS = { modified: "MODIFIED TRAUMA", full: "FULL TRAUMA" };
+
+// Who is responding to a trauma activation, from trauma_acks rows
+export function respondersText(acks) {
+  if (!acks || !acks.length) return "No providers responding yet";
+  return `Responding: ${acks.map((a) => a.display_name).join(", ")}`;
+}
+
 export function formatMiles(meters) {
   if (meters == null) return "";
   return `${(meters / 1609.34).toFixed(1)} mi`;

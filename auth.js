@@ -1,4 +1,4 @@
-// Sign-in shared by the EMS app and ED board.
+// Sign-in shared by the EMS app, ED board and Provider app.
 // Each device signs in once; the session is remembered on that device.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
@@ -7,7 +7,7 @@ import { SUPABASE_URL, SUPABASE_KEY } from "./config.js";
 export const db = createClient(SUPABASE_URL, SUPABASE_KEY);
 const $ = (id) => document.getElementById(id);
 
-const ROLE_NAMES = { rig: "rig phone", ed: "ED screen" };
+const ROLE_NAMES = { rig: "rig phone", ed: "ED screen", provider: "provider" };
 
 // Resolves with this device's account: { role, unit_id, hospital_id }.
 // Shows the #login form if the device isn't signed in yet.

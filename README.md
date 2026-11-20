@@ -11,6 +11,12 @@ Live, traffic-aware ETAs from Seattle Fire medic units to Seattle emergency depa
  GPS every 60 s                   ├─ checks the login is a rig             Google map + traffic layer
                                   ├─ Google Routes API (traffic-aware) ──►  live list sorted by ETA,
                                   └─ saves to units table ──push──►         countdown between updates
+                                                                            ED taps Modified / Full trauma
+                                                         set_trauma() ◄──── (two taps to confirm)
+                                                              │
+                                                              └──push──►   Provider app (provider.html)
+                                                                           physicians: alarm + live ETA,
+                                                                           "I'm responding" → shown to ED
 ```
 
 - **Frontend:** plain HTML/CSS/JavaScript, no build step, hosted on GitHub Pages (https is required for phone GPS).
@@ -23,7 +29,8 @@ Live, traffic-aware ETAs from Seattle Fire medic units to Seattle emergency depa
 - The public (publishable) key alone can't read or write anything.
 - Every device has its own login, entered once at setup and then remembered:
   - **Rig accounts:** one per rig phone, tied to a unit (e.g. `M10`). A rig can't write to the database directly; it can only send its position to the Edge Function, which decides which unit it is from the login.
-  - **ED accounts:** one per ED screen, tied to a hospital. They can only see units headed to that hospital.
+  - **ED accounts:** one per ED screen, tied to a hospital. They can only see units headed to that hospital, and only they can set a trauma code.
+  - **Provider accounts:** one per physician, tied to a hospital and a display name (e.g. "Dr. Lee"). They see units headed to their hospital and can mark themselves as responding.
 - If a phone is lost, delete or reset its user in Supabase → Authentication.
 
 ## Files
@@ -35,7 +42,8 @@ Live, traffic-aware ETAs from Seattle Fire medic units to Seattle emergency depa
 | `supabase/functions/eta/index.ts` | Edge Function: checks the login, gets the Google ETA, saves the update |
 | `auth.js` | Shared sign-in |
 | `ems.html` / `ems.js` | Rig phone: pick destination, sends GPS every minute |
-| `ed.html` / `ed.js` | ED board: live inbound list + Google map |
+| `ed.html` / `ed.js` | ED board: live inbound list + Google map, sets Modified/Full trauma codes |
+| `provider.html` / `provider.js` | Provider app: trauma alarms, live ETA, "I'm responding" |
 | `eta.js` | Display helpers |
 
 ## Setup
@@ -60,11 +68,18 @@ Live, traffic-aware ETAs from Seattle Fire medic units to Seattle emergency depa
 (Alternatively, with the Supabase CLI: `supabase link --project-ref zzwjxlmnfjujyzgdfdte`, then `supabase functions deploy eta`.)
 
 ### 4. Create device logins
-For each rig phone and ED screen: Authentication → Users → Add user → Create new user (tick Auto Confirm), then link it to a unit or hospital using the SQL at the bottom of `setup.sql`.
+For each rig phone, ED screen and provider: Authentication → Users → Add user → Create new user (tick Auto Confirm), then link it to a unit or hospital using the SQL at the bottom of `setup.sql`.
+
+## Trauma codes
+- The ED taps **Modified** or **Full** on an inbound unit, then taps again to confirm. **Cancel** clears the code. Changing Modified to Full counts as a new activation and alerts providers again.
+- Signed-in providers at that hospital get a repeating alarm (louder and faster for Full), vibration where supported, a flashing card with the live ETA, and a system notification if the tab is in the background (where the browser allows it).
+- **I'm responding** stops the alarm and shows the provider's name on the ED board and to the other providers. **Silence** stops the sound without responding.
+- A unit's trauma code clears automatically when it starts its next transport.
 
 ## Costs (Google)
 Traffic-aware Routes calls are billed as "Compute Routes Pro": 5,000 free per month, then about $10 per 1,000. Rough cost: one call per minute per transporting unit, so a 15-minute transport ≈ 15 calls. The Edge Function never calls Google more than once every 45 seconds per unit. The ED map is billed separately as Maps JavaScript API map loads, and each ED screen only loads the map once.
 
 ## Known limits / next steps
+- Provider alerts only sound while the Provider page is open and the screen is on, because a web page can't wake a locked phone. Real lock-screen alerts need Web Push (an installed web app) or a native app, SMS, or pager integration.
 - The rig phone must keep the screen on (web pages pause when locked). A native app is planned.
 - Google ETAs assume normal driving, not lights-and-sirens, so they should be calibrated against logged predicted vs. actual arrival times.

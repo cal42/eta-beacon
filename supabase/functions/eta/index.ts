@@ -90,7 +90,7 @@ Deno.serve(async (req) => {
       route = straightLineEstimate(lat, lng, hospital.lat, hospital.lng);
     }
 
-    const row = {
+    const row: Record<string, unknown> = {
       unit_id: unitId,
       hospital_id: hospital.id,
       status: "enroute",
@@ -101,6 +101,11 @@ Deno.serve(async (req) => {
       eta_source: route.source,
       updated_at: now.toISOString(),
     };
+    // New transport (or diverted to a different hospital): clear any old trauma code.
+    // Otherwise the ED's trauma code is left untouched.
+    if (!prev || prev.status !== "enroute" || prev.hospital_id !== hospital.id) {
+      Object.assign(row, { trauma_level: null, trauma_id: null, trauma_set_at: null });
+    }
     const { error } = await admin.from("units").upsert(row);
     if (error) return json({ error: error.message }, 500);
     return json(row);
