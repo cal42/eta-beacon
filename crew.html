@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ETA Beacon – Crew</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="crew">
+  <h1>ETA Beacon <span>Crew</span></h1>
+
+  <section id="setup">
+    <label>Unit
+      <input id="unit" placeholder="e.g. M14" autocapitalize="characters" autocomplete="off">
+    </label>
+    <label>Destination
+      <select id="hospital"></select>
+    </label>
+    <button id="start" class="big go">Start transport</button>
+    <p id="msg" class="sub"></p>
+  </section>
+
+  <section id="live" hidden>
+    <div class="sub" id="dest"></div>
+    <div class="eta" id="eta">--</div>
+    <div class="sub" id="dist"></div>
+    <div class="sub" id="status"></div>
+    <p class="hint">Keep this screen open during transport.</p>
+    <button id="arrived" class="big stop">Arrived</button>
+  </section>
+
+  <script type="module" src="crew.js"></script>
+</body>
+</html>
