@@ -9,9 +9,31 @@
 <body class="ed">
   <header>
     <h1>ETA Beacon <span id="hospname">Inbound</span></h1>
+    <button id="radio-btn" class="tbtn radiobtn" type="button" hidden>Log radio ETA</button>
+    <button id="issue-btn" class="tbtn radiobtn" type="button" hidden>Report issue</button>
     <span id="conn" class="bad">Connecting…</span>
     <button id="signout" class="link" hidden>Sign out</button>
   </header>
+
+  <form id="radio" class="radiobar" hidden autocomplete="off">
+    <span class="sub">Radio ETA</span>
+    <input id="r-unit" list="r-units" placeholder="Unit (M1)" autocapitalize="characters" maxlength="12">
+    <input id="r-min" type="number" inputmode="numeric" min="0" max="180" placeholder="Minutes">
+    <input id="r-note" placeholder="Note (optional)" maxlength="200">
+    <button class="tbtn" id="r-save">Log</button>
+    <label class="checkline"><input type="checkbox" id="r-mark"> Not on the board? Show as transporting here</label>
+    <datalist id="r-units"></datalist>
+    <span class="sub" id="r-msg"></span>
+    <div id="r-recent"></div>
+  </form>
+
+  <form id="issue" class="radiobar" hidden autocomplete="off">
+    <span class="sub">Report an issue</span>
+    <input id="i-unit" list="r-units" placeholder="Unit (optional)" autocapitalize="characters" maxlength="12">
+    <input id="i-text" placeholder="What happened? (e.g. board froze, ETA way off, wrong unit)" maxlength="2000">
+    <button class="tbtn" id="i-send">Send</button>
+    <span class="sub" id="i-msg"></span>
+  </form>
 
   <form id="login" class="panel" hidden>
     <p class="sub">Sign in this ED screen.</p>

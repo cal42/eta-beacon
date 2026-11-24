@@ -8,6 +8,9 @@
 </head>
 <body class="ems">
   <h1>ETA Beacon <span>EMS</span></h1>
+  <div id="shadow" class="shadowbar" hidden>
+    <strong>SHADOW MODE</strong> — the ED can't see this unit. Give radio ETAs as usual.
+  </div>
 
   <form id="login" hidden>
     <p class="sub">One-time setup for this rig phone.</p>
@@ -23,11 +26,22 @@
 
   <section id="setup" hidden>
     <div class="unitname" id="unit"></div>
+    <div id="service" class="service on">● In service</div>
     <label>Destination
       <select id="hospital"></select>
     </label>
     <button id="start" class="big go">Start transport</button>
     <p id="msg" class="sub"></p>
+    <p class="hint">Keep this app open with the screen on while in service, so the MSO can see this unit.</p>
+    <div class="svcbox">
+      <div class="sub">Unit status</div>
+      <div class="svcbtns">
+        <button id="svc-in" class="tbtn" type="button">In service</button>
+        <button id="svc-out" class="tbtn" type="button">Out of service</button>
+        <button id="svc-special" class="tbtn" type="button">Special event</button>
+      </div>
+      <div id="special-picker" hidden></div>
+    </div>
     <button id="signout" class="link">Sign this phone out</button>
   </section>
 
@@ -44,6 +58,7 @@
     </div>
     <div class="sub" id="diff"></div>
     <div class="sub" id="mode"></div>
+    <div class="sub" id="motion"></div>
     <div class="sub" id="dist"></div>
     <div class="sub" id="status"></div>
     <p class="hint">Keep this screen open during transport. Arrival is recorded automatically at the ED entrance.</p>

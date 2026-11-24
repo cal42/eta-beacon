@@ -1,4 +1,4 @@
-// Sign-in shared by the EMS app, ED board and Provider app.
+// Sign-in shared by the EMS app, ED board, Provider app and MSO view.
 // Each device signs in once; the session is remembered on that device.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
@@ -7,9 +7,9 @@ import { SUPABASE_URL, SUPABASE_KEY } from "./config.js";
 export const db = createClient(SUPABASE_URL, SUPABASE_KEY);
 const $ = (id) => document.getElementById(id);
 
-const ROLE_NAMES = { rig: "rig phone", ed: "ED screen", provider: "provider" };
+const ROLE_NAMES = { rig: "rig phone", ed: "ED screen", provider: "provider", mso: "MSO" };
 
-// Resolves with this device's account: { role, unit_id, hospital_id }.
+// Resolves with this device's account: { role, unit_id, hospital_id, agency_id, display_name }.
 // Shows the #login form if the device isn't signed in yet.
 export async function signIn(role) {
   const { data: { session } } = await db.auth.getSession();
@@ -44,7 +44,7 @@ export async function signIn(role) {
 }
 
 async function loadAccount() {
-  const { data } = await db.from("accounts").select("role, unit_id, hospital_id").maybeSingle();
+  const { data } = await db.from("accounts").select("role, unit_id, hospital_id, agency_id, display_name").maybeSingle();
   return data;
 }
 

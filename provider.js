@@ -1,5 +1,5 @@
 import { db, signIn, signOut } from "./auth.js";
-import { formatEta, formatMiles, TRAUMA_LABELS, respondersText } from "./eta.js";
+import { formatEta, formatMiles, TRAUMA_LABELS, respondersText, etaLeftSeconds, movementLine, arrivalLine } from "./eta.js";
 
 const ALERT_IF_NEWER_THAN_S = 15 * 60;  // alarm for activations up to 15 min old (e.g. after reconnecting)
 const HIDE_ARRIVED_AFTER_S = 30 * 60;  // keep arrived traumas visible for 30 min
@@ -96,7 +96,7 @@ function activeTraumas() {
     .filter((r) => r.trauma_level && r.trauma_id)
     .map((r) => {
       const ageS = (Date.now() - Date.parse(r.updated_at)) / 1000;
-      return { r, ageS, leftS: Math.max(0, (r.eta_seconds ?? 0) - ageS) };
+      return { r, ageS, leftS: etaLeftSeconds(r) };
     })
     .filter((x) =>
       x.r.status === "enroute" ? x.ageS < IGNORE_AFTER_S
@@ -198,7 +198,8 @@ function render() {
     card.append(el("div", "tunit", `${r.unit_id} → ${hospital.name}`));
     const eta = el("div", "eta");
     const meta = el("div", "sub");
-    card.append(eta, meta);
+    const line = el("div", "phase");
+    card.append(eta, line, meta);
     card.append(el("div", "sub responders", respondersText(acks.filter((a) => a.trauma_id === r.trauma_id))));
 
     if (r.status === "enroute") {
@@ -223,25 +224,27 @@ function render() {
       }
     }
     list.append(card);
-    cardEls.set(r.unit_id, { eta, meta });
+    cardEls.set(r.unit_id, { eta, line, meta });
   }
   tick();
 }
 
 function tick() {
-  for (const [id, { eta, meta }] of cardEls) {
+  for (const [id, { eta, line, meta }] of cardEls) {
     const r = units.get(id);
     if (!r) continue;
-    const ageS = (Date.now() - Date.parse(r.updated_at)) / 1000;
     const setS = (Date.now() - Date.parse(r.trauma_set_at)) / 1000;
     const onScene = r.status === "enroute" && r.phase === "onscene";
+    const left = etaLeftSeconds(r);
     eta.textContent = r.status === "arrived" ? "ARRIVED"
-      : onScene ? `On scene · ${formatEta(r.eta_seconds)} away`
-      : formatEta(Math.max(0, (r.eta_seconds ?? 0) - ageS));
+      : onScene ? `On scene · ${formatEta(left)} away`
+      : r.eta_seconds == null ? "ETA ?" : formatEta(left);
+    const m = r.status === "enroute" ? movementLine(r) : r.status === "arrived" ? arrivalLine(r) : null;
+    line.textContent = m?.text ?? "";
+    line.className = m?.cls ?? "phase";
     meta.textContent =
       `Activated ${Math.max(0, Math.round(setS / 60))} min ago` +
-      (r.status === "enroute" ? ` · ${formatMiles(r.distance_m)}` : "") +
-      (r.status === "enroute" && !onScene ? " · transporting" : "");
+      (r.status === "enroute" && r.distance_m != null ? ` · ${formatMiles(r.distance_m)}` : "");
   }
 }
 setInterval(tick, 1000);

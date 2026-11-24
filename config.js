@@ -16,4 +16,7 @@ export const GOOGLE_MAP_ID = "DEMO_MAP_ID";
 // How often the rig phone sends a position + ETA update (milliseconds)
 export const UPDATE_INTERVAL_MS = 60000;
 
+// How often an in-service rig phone checks in between transports (no Google call)
+export const IDLE_UPDATE_INTERVAL_MS = 120000;
+
 // Hospitals now live in the database (hospitals table) — see setup.sql.

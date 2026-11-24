@@ -65,6 +65,10 @@ main { flex: 1; display: flex; min-height: 0; }
   color: #fff; box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5); white-space: nowrap;
 }
 .pin.unit { background: #1e88e5; }
+.pin.unit.onscene { background: #b7791f; }
+.pin.unit.arrived { background: #2e7d32; }
+.pin.unit.available { background: #455a64; }
+.pin.unit.special { background: #7b1fa2; }
 .pin.hosp { background: #e53935; }
 .pin.unit.modified { background: #ef6c00; }
 .pin.unit.full { background: #c62828; outline: 2px solid #fff; }
@@ -126,3 +130,98 @@ body.provider #app { margin-top: 1rem; }
   main { flex-direction: column; }
   .ed #list { width: 100%; max-height: 55vh; }
 }
+
+/* ---- MSO view ---- */
+.mso .dest { color: #cfd6df; font-weight: 600; margin: 0.15rem 0; }
+.mso .card.clickable { cursor: pointer; }
+.mso .card.clickable:hover { background: #222831; }
+#summary { margin-bottom: 1rem; }
+.sumline { font-weight: 700; margin-bottom: 0.5rem; }
+.hospline { padding: 0.35rem 0; border-bottom: 1px solid #2c333d; font-size: 0.95rem; }
+#mapwrap { flex: 1; position: relative; min-height: 0; }
+.mso #map { position: absolute; inset: 0; }
+.selpanel {
+  position: absolute; top: 0.75rem; right: 0.75rem; width: min(340px, calc(100% - 1.5rem));
+  background: rgba(17, 20, 24, 0.95); border: 1px solid #2c333d; border-radius: 14px;
+  padding: 0.9rem 1rem; box-shadow: 0 4px 18px rgba(0, 0, 0, 0.5); z-index: 5;
+}
+.seltop { display: flex; justify-content: space-between; align-items: flex-start; gap: 0.5rem; }
+.selpanel .unit { font-weight: 800; font-size: 1.3rem; }
+.sel-label { margin-top: 0.6rem; font-weight: 600; color: #cfd6df; }
+.etarow.small { padding: 0.4rem 0.7rem; margin: 0.4rem 0; }
+.etarow.small .etaval { font-size: 1.8rem; }
+#sel-refresh { margin-top: 0.5rem; flex: none; width: 100%; }
+.mso .card.selected { outline: 2px solid #f2f4f7; }
+.pin.selected { outline: 3px solid #fff; transform: scale(1.15); }
+.pin.you { background: #f2f4f7; color: #111418; }
+@media (max-width: 700px) {
+  #mapwrap { min-height: 55vh; }
+}
+
+/* In service indicator (EMS app) */
+.service { font-weight: 700; margin: -0.5rem 0 1rem; }
+.service.on { color: #81c784; }
+.service.off { color: #9aa4b2; }
+
+/* Available units + out of service (MSO) */
+.card.available { border-left-color: #607d8b; }
+.phase.available { color: #b0bec5; }
+.sumcounts { margin: -0.3rem 0 0.5rem; }
+.oos { margin-top: 1.25rem; padding-top: 0.75rem; border-top: 1px solid #2c333d; }
+.oos-title { font-weight: 700; color: #cfd6df; margin-bottom: 0.3rem; }
+
+/* Service status: In service / Out of service / Special event */
+.service.special { color: #ce93d8; }
+.card.special { border-left-color: #8e24aa; }
+.phase.special { color: #ce93d8; }
+.svcbox { margin: 1rem 0; }
+.svcbtns { display: flex; gap: 0.5rem; margin: 0.4rem 0; flex-wrap: wrap; }
+.svcbtns .tbtn { flex: 1; min-width: 6.5rem; }
+.tbtn.current { background: #1e88e5; border-color: #1e88e5; color: #fff; }
+.tbtn.special { border-color: #8e24aa; color: #e1bee7; width: 100%; margin-top: 0.4rem; }
+.tbtn.special:disabled { opacity: 0.5; cursor: default; }
+.picker { margin: 0.4rem 0; padding: 0.6rem; border: 1px solid #2c333d; border-radius: 10px; }
+.pickrow { display: flex; gap: 0.5rem; }
+.pickrow select { margin: 0; padding: 0.5rem; font-size: 1rem; }
+.sel-svc { margin: 0.6rem 0; padding-bottom: 0.6rem; border-bottom: 1px solid #2c333d; }
+.oosline { padding: 0.3rem 0.2rem; border-radius: 6px; }
+.oosline.clickable { cursor: pointer; }
+.oosline.clickable:hover, .oosline.selected { background: #222831; }
+
+/* Shadow mode banner (EMS) + badge (MSO) */
+.shadowbar {
+  background: #4a3b00; border: 1px solid #f9a825; color: #ffe082;
+  border-radius: 10px; padding: 0.6rem 0.8rem; margin: -0.25rem 0 1rem; font-size: 0.95rem;
+}
+.badge.shadow { background: #4a3b00; color: #ffe082; border: 1px solid #f9a825; }
+
+/* Log radio ETA bar (ED board) */
+.radiobtn { flex: none; }
+.radiobar {
+  display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;
+  padding: 0.6rem 1rem; border-bottom: 1px solid #2c333d; background: #161a1f;
+}
+.radiobar input { width: auto; margin: 0; padding: 0.5rem 0.6rem; font-size: 1rem; }
+.radiobar #r-unit { width: 7rem; }
+.radiobar #r-min { width: 6.5rem; }
+.radiobar #r-note { flex: 1; min-width: 8rem; }
+.radiobar .tbtn { flex: none; padding: 0.5rem 1rem; }
+#r-recent { width: 100%; display: flex; gap: 1rem; flex-wrap: wrap; font-size: 0.85rem; color: #9aa4b2; }
+.rline .link { padding: 0; font-size: 0.85rem; }
+
+/* Stopped after leaving the scene */
+.phase.stopped { color: #ffb74d; font-variant-numeric: tabular-nums; }
+.phase.stopped.care { color: #ff8a80; }
+.card.stopped-care { border-left-color: #e53935; }
+
+/* ED: one-tap ETA rating + "show as transporting" checkbox */
+.rating { display: flex; align-items: center; gap: 0.5rem; margin-top: 0.6rem; flex-wrap: wrap; }
+.tbtn.rate { flex: none; padding: 0.4rem 0.8rem; }
+.checkline { display: flex; align-items: center; gap: 0.35rem; margin: 0; color: #cfd6df; font-size: 0.9rem; }
+.checkline input { width: auto; margin: 0; }
+
+/* Arrival stages: on the ramp → through the doors */
+.phase.arrived.ramp { color: #81c784; }
+.phase.arrived.doors { color: #4fc3f7; }
+.tbtn.doors { border-color: #2e7d32; color: #a5d6a7; }
+.tbtn.doors.armed { background: #2e7d32; color: #fff; }

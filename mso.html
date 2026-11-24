@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ETA Beacon – MSO</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="ed mso">
+  <header>
+    <h1>ETA Beacon <span id="title">MSO</span></h1>
+    <span id="conn" class="bad">Connecting…</span>
+    <button id="signout" class="link" hidden>Sign out</button>
+  </header>
+
+  <form id="login" class="panel" hidden>
+    <p class="sub">Sign in to the shift supervisor view.</p>
+    <label>MSO login
+      <input id="email" type="email" autocomplete="username" placeholder="mso@sfd.etabeacon">
+    </label>
+    <label>Password
+      <input id="password" type="password" autocomplete="current-password">
+    </label>
+    <button class="big go">Sign in</button>
+    <p id="loginMsg" class="sub"></p>
+  </form>
+
+  <main id="board" hidden>
+    <div id="list">
+      <div id="summary"></div>
+      <div id="units"></div>
+    </div>
+    <div id="mapwrap">
+      <div id="map"></div>
+      <div id="sel" class="selpanel" hidden>
+        <div class="seltop">
+          <div>
+            <div class="unit" id="sel-unit"></div>
+            <div class="sub" id="sel-info"></div>
+          </div>
+          <button id="sel-close" class="link" aria-label="Close">Close</button>
+        </div>
+        <div class="sel-svc">
+          <div class="sub" id="sel-svc-text"></div>
+          <div class="svcbtns">
+            <button class="tbtn" type="button" data-svc="in_service">In service</button>
+            <button class="tbtn" type="button" data-svc="out_of_service">Out of service</button>
+            <button class="tbtn" type="button" data-svc="special_event">Special event</button>
+          </div>
+          <div id="sel-picker" hidden></div>
+          <div class="sub" id="sel-svc-msg"></div>
+        </div>
+        <div id="sel-eta">
+          <div class="sub sel-label" id="sel-label">Your ETA to this unit</div>
+          <div class="etarow small" id="sel-row-normal">
+            <span class="etalabel">No lights &amp; sirens</span>
+            <span class="etaval" id="sel-normal">--</span>
+          </div>
+          <div class="etarow small" id="sel-row-ls">
+            <span class="etalabel">Lights &amp; sirens</span>
+            <span class="etaval" id="sel-ls">--</span>
+          </div>
+          <div class="sub" id="sel-status"></div>
+          <button id="sel-refresh" class="tbtn">Refresh</button>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script type="module" src="mso.js"></script>
+</body>
+</html>
